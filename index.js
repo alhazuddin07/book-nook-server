@@ -4,7 +4,7 @@ import 'dotenv/config'
 import cors from 'cors';
 
 
-const app = express()
+const app = express();
 const PORT = 5000
 
 app.use(express.json());
@@ -20,7 +20,7 @@ export async function connectToMongoDB() {
   } catch (err) {
     console.dir(err);
   }
-}
+};
 
 const connectClient = await connectToMongoDB();
 
@@ -31,7 +31,7 @@ const bookCollection = db.collection("books");
 app.post('/add-book', async( req, res )=> {
   const bookData = req.body;
   const result = await bookCollection.insertOne(bookData);
-  res.send(result)
+  res.send(result);
 });
 
 app.get('/all-books', async(req, res)=> {
@@ -46,7 +46,7 @@ app.get('/book/:id', async(req, res)=> {
 });
 
 app.get('/', (req, res) => {
-  res.send('Hello World!')
+  res.send('Hello World!');
 });
 
 app.listen(PORT, () => {
