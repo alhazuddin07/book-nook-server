@@ -26,22 +26,67 @@ const connectClient = await connectToMongoDB();
 
 const db = connectClient.db("book-nook");
 const bookCollection = db.collection("books");
+const borrowCollection = db.collection("my-borrow");
 
 
-app.post('/add-book', async( req, res )=> {
+app.post('/add-book', async (req, res) => {
   const bookData = req.body;
   const result = await bookCollection.insertOne(bookData);
   res.send(result);
 });
 
-app.get('/all-books', async(req, res)=> {
+app.post('/my-borrow', async (req, res) => {
+  const data = req.body;
+  const result = await borrowCollection.insertOne(data);
+  res.send(result);
+});
+
+app.patch('/book/:id', async (req, res) => {
+  const { id } = req.params;
+
+  const result = await bookCollection.updateOne(
+    {
+      _id: new ObjectId(id),
+      totalCopies: { $gt: 0 }
+    },
+    {
+      $inc: {
+        totalCopies: -1
+      }
+    }
+  );
+
+  if (result.matchedCount === 0) {
+    return res.status(400).send({
+      message: "Book is not available"
+    });
+  }
+
+  res.send({
+    success: true,
+    message: "Book copies updated successfully"
+  });
+});
+
+app.get('/my-borrow', async (req, res) => {
+  const { email, bookId } = req.query;
+
+  const result = await borrowCollection.findOne({
+    email,
+    bookId
+  });
+
+  res.send({ alreadyBorrowed: !!result });
+});
+
+app.get('/all-books', async (req, res) => {
   const result = await bookCollection.find().toArray();
   res.send(result);
 });
 
-app.get('/book/:id', async(req, res)=> {
-  const {id} = req.params;
-  const result = await bookCollection.findOne({_id: new ObjectId(id)});
+app.get('/book/:id', async (req, res) => {
+  const { id } = req.params;
+  const result = await bookCollection.findOne({ _id: new ObjectId(id) });
   res.send(result);
 });
 
