@@ -29,6 +29,21 @@ const bookCollection = db.collection("books");
 const borrowCollection = db.collection("my-borrow");
 
 
+const verifyToken = (req, res, next) => {
+  const authHeaders = req.headers.authorization;
+  console.log(authHeaders);
+
+  if (authHeaders !== 'user logged in') {
+    return res.status(401).send({ msg: 'Unauthorized' });
+  };
+
+  console.log('I am middleware');
+
+  next();
+
+};
+
+
 app.post('/add-book', async (req, res) => {
   const bookData = req.body;
   const result = await bookCollection.insertOne(bookData);
@@ -282,7 +297,7 @@ app.get('/all-books', async (req, res) => {
   res.send(result);
 });
 
-app.get('/book/:id', async (req, res) => {
+app.get('/book/:id', verifyToken, async (req, res) => {
   const { id } = req.params;
   const result = await bookCollection.findOne({ _id: new ObjectId(id) });
   res.send(result);
