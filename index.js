@@ -2,6 +2,7 @@ import express from 'express';
 import { MongoClient, ObjectId } from 'mongodb';
 import 'dotenv/config'
 import cors from 'cors';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 
 const app = express();
@@ -29,17 +30,31 @@ const bookCollection = db.collection("books");
 const borrowCollection = db.collection("my-borrow");
 
 
-const verifyToken = (req, res, next) => {
+const verifyToken = async(req, res, next) => {
   const authHeaders = req.headers.authorization;
-  console.log(authHeaders);
 
-  if (authHeaders !== 'user logged in') {
-    return res.status(401).send({ msg: 'Unauthorized' });
+  if(!authHeaders){
+    return res.status(401).send({msg: 'Unauthorized!'});
   };
 
-  console.log('I am middleware');
+  const token = authHeaders.split(' ')[1]
+  console.log(token);
 
-  next();
+  if(!token){
+    return res.status(401).send({msg: 'Unauthorized'});
+  };
+
+  const JWKS = createRemoteJWKSet(new URL('http://localhost:3000/api/auth/jwks'));
+
+  try {
+
+    const { payload } = await jwtVerify(token, JWKS);
+
+    next();
+
+  } catch (error) {
+    return res.status(401).send({msg: 'Please login first'});
+  };
 
 };
 
