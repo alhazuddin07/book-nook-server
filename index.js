@@ -30,21 +30,20 @@ const bookCollection = db.collection("books");
 const borrowCollection = db.collection("my-borrow");
 
 
-const verifyToken = async(req, res, next) => {
+const verifyToken = async (req, res, next) => {
   const authHeaders = req.headers.authorization;
 
-  if(!authHeaders){
-    return res.status(401).send({msg: 'Unauthorized!'});
+  if (!authHeaders) {
+    return res.status(401).send({ msg: 'Unauthorized!' });
   };
 
   const token = authHeaders.split(' ')[1]
-  console.log(token);
 
-  if(!token){
-    return res.status(401).send({msg: 'Unauthorized'});
+  if (!token) {
+    return res.status(401).send({ msg: 'Unauthorized' });
   };
 
-  const JWKS = createRemoteJWKSet(new URL('http://localhost:3000/api/auth/jwks'));
+  const JWKS = createRemoteJWKSet(new URL(`${process.env.CLIENT_URL}/api/auth/jwks`));
 
   try {
 
@@ -53,19 +52,19 @@ const verifyToken = async(req, res, next) => {
     next();
 
   } catch (error) {
-    return res.status(401).send({msg: 'Please login first'});
+    return res.status(401).send({ msg: 'Please login first' });
   };
 
 };
 
 
-app.post('/add-book', async (req, res) => {
+app.post('/add-book', verifyToken, async (req, res) => {
   const bookData = req.body;
   const result = await bookCollection.insertOne(bookData);
   res.send(result);
 });
 
-app.get('/my-books', async (req, res) => {
+app.get('/my-books', verifyToken, async (req, res) => {
   const { email } = req.query;
 
   if (!email) {
@@ -80,7 +79,7 @@ app.get('/my-books', async (req, res) => {
   res.send(result);
 });
 
-app.post('/my-borrow', async (req, res) => {
+app.post('/my-borrow', verifyToken, async (req, res) => {
   const data = req.body;
   const { email, bookId } = data;
 
@@ -138,7 +137,7 @@ app.post('/my-borrow', async (req, res) => {
   }
 });
 
-app.put('/book/:id', async (req, res) => {
+app.patch('/book/:id', verifyToken, async (req, res) => {
   const { id } = req.params;
   const { email } = req.query;
 
@@ -146,32 +145,17 @@ app.put('/book/:id', async (req, res) => {
     return res.status(400).send({ message: "Invalid book id" });
   }
 
-  if (!email) {
-    return res.status(400).send({ message: "Email is required" });
-  }
-
   const updates = {};
 
-  for (const field of ["title", "author", "category", "description"]) {
-    if (typeof req.body[field] === "string" && req.body[field].trim()) {
-      updates[field] = req.body[field].trim();
-    }
-  }
+  const { title, author, category, description, totalCopies } = req.body;
 
-  if (req.body.totalCopies !== undefined) {
-    const totalCopies = Number(req.body.totalCopies);
+  if (title) updates.title = title;
+  if (author) updates.author = author;
+  if (category) updates.category = category;
+  if (description) updates.description = description;
 
-    if (!Number.isInteger(totalCopies) || totalCopies < 0) {
-      return res.status(400).send({
-        message: "Available copies must be zero or more",
-      });
-    }
-
-    updates.totalCopies = totalCopies;
-  }
-
-  if (Object.keys(updates).length === 0) {
-    return res.status(400).send({ message: "No valid fields to update" });
+  if (totalCopies !== undefined) {
+    updates.totalCopies = Number(totalCopies);
   }
 
   const result = await bookCollection.updateOne(
@@ -183,11 +167,14 @@ app.put('/book/:id', async (req, res) => {
     return res.status(404).send({ message: "Book not found" });
   }
 
-  const book = await bookCollection.findOne({ _id: new ObjectId(id) });
-  res.send(book);
+  const updatedBook = await bookCollection.findOne({
+    _id: new ObjectId(id)
+  });
+
+  res.send(updatedBook);
 });
 
-app.delete('/book/:id', async (req, res) => {
+app.delete('/book/:id', verifyToken, async (req, res) => {
   const { id } = req.params;
   const { email } = req.query;
 
@@ -211,7 +198,7 @@ app.delete('/book/:id', async (req, res) => {
   res.send({ success: true });
 });
 
-app.patch('/book/:id', async (req, res) => {
+app.patch('/book/:id', verifyToken, async (req, res) => {
   const { id } = req.params;
 
   const result = await bookCollection.updateOne(
@@ -238,7 +225,7 @@ app.patch('/book/:id', async (req, res) => {
   });
 });
 
-app.get('/my-borrow', async (req, res) => {
+app.get('/my-borrow', verifyToken, async (req, res) => {
   const { email, bookId } = req.query;
 
   const result = await borrowCollection.findOne({
@@ -249,7 +236,7 @@ app.get('/my-borrow', async (req, res) => {
   res.send({ alreadyBorrowed: !!result });
 });
 
-app.get('/my-borrows', async (req, res) => {
+app.get('/my-borrows', verifyToken, async (req, res) => {
   const { email } = req.query;
 
   if (!email) {
@@ -264,7 +251,7 @@ app.get('/my-borrows', async (req, res) => {
   res.send(result);
 });
 
-app.delete('/my-borrows/:id', async (req, res) => {
+app.delete('/my-borrows/:id', verifyToken, async (req, res) => {
   const { id } = req.params;
 
   if (!ObjectId.isValid(id)) {
@@ -308,7 +295,7 @@ app.delete('/my-borrows/:id', async (req, res) => {
 });
 
 app.get('/all-books', async (req, res) => {
-  const result = await bookCollection.find().toArray();
+  const result = await bookCollection.find().sort({ _id: -1 }).toArray();
   res.send(result);
 });
 
@@ -323,5 +310,7 @@ app.get('/', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
+  console.log(`Server running on port ${PORT}`);
 });
+
+export default app;
